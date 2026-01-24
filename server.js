@@ -58,9 +58,7 @@ app.get("/", (req, res) =>
  */
 app.post("/webhook", async (req, res) => {
   try {
-    // log singkat biar gampang debug (boleh hapus kalau sudah stabil)
-    // console.log("📩 WEBHOOK HIT", new Date().toISOString());
-
+    console.log("📩 UPDATE MASUK:", JSON.stringify(req.body));
     await bot.processUpdate(req.body);
     res.sendStatus(200);
   } catch (e) {
@@ -215,5 +213,6 @@ app.listen(PORT, () => {
   console.log("✅ Webhook endpoint: POST /webhook");
   console.log("✅ Sheet:", SHEET_NAME);
 });
+
 
 
