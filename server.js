@@ -162,7 +162,8 @@ bot.on("message", async (msg) => {
   // format:
   // sedekah12 T01 ndp
   // Koying12345 T02 rdp / rd
-  const m = text.match(/^(.+?)\s+(T0[0-5])\s+(ndp|rdp|rd)$/i);
+const text = (msg.caption || msg.text || "").replace(/\s+/g, " ").trim();
+const m = text.match(/^(.+?)\s+\/?@?(T0[0-5])\s+(ndp|rd)$/i);
   if (!m) return;
 
   const namaValue = m[1].trim();        // sedekah12 / Koying12345
@@ -213,6 +214,7 @@ app.listen(PORT, () => {
   console.log("✅ Webhook endpoint: POST /webhook");
   console.log("✅ Sheet:", SHEET_NAME);
 });
+
 
 
 
