@@ -96,6 +96,34 @@ function colToLetter(colIndex) {
   }
   return letter;
 }
+// 🔴 TAMBAHAN HELPER UNTUK RDP / NDP
+function getBaseColIndex(groupKey) {
+  const g = groupKey.toLowerCase();
+  if (g === "ndp") return 7;               // H
+  if (g === "rdp" || g === "rd") return 0; // A
+  return null;
+}
+
+// data mulai dari row 3
+async function findNextEmptyRowInColumnFromRow(sheetName, colLetter, startRow = 3) {
+  const gridRes = await sheets.spreadsheets.get({
+    spreadsheetId: SHEET_ID,
+    ranges: [`${sheetName}!${colLetter}${startRow}:${colLetter}`],
+    includeGridData: true,
+  });
+
+  const rowData = gridRes.data.sheets?.[0]?.data?.[0]?.rowData || [];
+
+  let idx = rowData.findIndex((r) => {
+    const cell = r.values?.[0];
+    const val = cell?.formattedValue;
+    return !val || val === "";
+  });
+
+  if (idx === -1) idx = rowData.length;
+
+  return idx + startRow;
+}
 
 /**
  * Cari baris kosong berikutnya pada kolom tertentu
@@ -127,67 +155,53 @@ async function findNextEmptyRowInColumn(spreadsheetId, sheetName, colIndex) {
    MESSAGE HANDLER
 ======================= */
 bot.on("message", async (msg) => {
-  // ✅ hanya proses dari group/supergroup
   if (!isGroupChat(msg)) return;
 
   const chatId = msg.chat.id;
-  const text = msg.caption || msg.text || "";
+  const text = (msg.caption || msg.text || "").trim();
+  if (!text) return;
 
-  // format: NAMA/ANGKA
-  const match = text.match(/^(.+?)\/(\d+)$/);
-  if (!match) return;
+  // format:
+  // sedekah12 T01 ndp
+  // Koying12345 T02 rdp / rd
+  const m = text.match(/^(.+?)\s+(T0[0-5])\s+(ndp|rdp|rd)$/i);
+  if (!m) return;
 
-  const nama = match[1].trim().toUpperCase();
-  const poin = match[2];
+  const namaValue = m[1].trim();        // sedekah12 / Koying12345
+  const tKey = m[2].toUpperCase();      // T00 - T05
+  const groupKey = m[3].toLowerCase();  // ndp / rdp / rd
+
+  const base = getBaseColIndex(groupKey);
+  if (base === null) return;
+
+  const tOffset = parseInt(tKey.slice(1), 10); // 00..05 => 0..5
+  const colIndex = base + tOffset;
+  const colLetter = colToLetter(colIndex);
 
   try {
-    // ambil header baris 1
-    const headerRes = await sheets.spreadsheets.values.get({
-      spreadsheetId: SHEET_ID,
-      range: `${SHEET_NAME}!1:1`,
-    });
-
-    const headers = headerRes.data.values
-      ? headerRes.data.values[0].map((h) => (h || "").toString().toUpperCase())
-      : [];
-
-    const colIndex = headers.indexOf(nama);
-
-    if (colIndex === -1) {
-      await safeSendMessage(chatId, `⚠️ Nama "${nama}" belum ada di header!`, {
-        reply_to_message_id: msg.message_id,
-      });
-      return;
-    }
-
-    // cari baris kosong berikutnya (start baris 2)
-    const rowNumber = await findNextEmptyRowInColumn(
-      SHEET_ID,
+    const rowNumber = await findNextEmptyRowInColumnFromRow(
       SHEET_NAME,
-      colIndex
+      colLetter,
+      3 // data mulai row 3
     );
 
-    const colLetter = colToLetter(colIndex);
-
-    // update cell
     await sheets.spreadsheets.values.update({
       spreadsheetId: SHEET_ID,
       range: `${SHEET_NAME}!${colLetter}${rowNumber}`,
       valueInputOption: "USER_ENTERED",
-      requestBody: { values: [[poin]] },
+      requestBody: { values: [[namaValue]] },
     });
 
-    // reply sukses seperti contoh kamu
     await safeSendMessage(
       chatId,
-      `✅ Data disimpan!\nNama: ${nama}\nNilai: ${poin}\n📊 Baris ke-${rowNumber}`,
+      `✅ Disimpan!\nGrup: ${groupKey.toUpperCase()}\nKolom: ${tKey}\nValue: ${namaValue}\n📊 Baris: ${rowNumber}`,
       { reply_to_message_id: msg.message_id }
     );
 
-    console.log(`✅ INPUT OK: ${nama}/${poin} -> ${SHEET_NAME}!${colLetter}${rowNumber}`);
+    console.log(`✅ INPUT OK: ${namaValue} -> ${SHEET_NAME}!${colLetter}${rowNumber}`);
   } catch (e) {
     console.error("❌ Sheets error:", e?.message || e);
-    await safeSendMessage(chatId, "❌ Gagal menyimpan ke Google Sheets.", {
+    await safeSendMessage(chatId, "❌ Gagal simpan ke Google Sheets.", {
       reply_to_message_id: msg.message_id,
     });
   }
@@ -201,3 +215,4 @@ app.listen(PORT, () => {
   console.log("✅ Webhook endpoint: POST /webhook");
   console.log("✅ Sheet:", SHEET_NAME);
 });
+
