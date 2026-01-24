@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 3000;
 ======================= */
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const SHEET_ID = process.env.SHEET_ID;
-const SHEET_NAME = process.env.SHEET_NAME || "Sheet182";
+const SHEET_NAME = process.env.SHEET_NAME || "bot depo";
 const GOOGLE_CREDENTIALS = process.env.GOOGLE_CREDENTIALS;
 
 if (!TELEGRAM_TOKEN || !SHEET_ID || !GOOGLE_CREDENTIALS) {
@@ -215,4 +215,5 @@ app.listen(PORT, () => {
   console.log("✅ Webhook endpoint: POST /webhook");
   console.log("✅ Sheet:", SHEET_NAME);
 });
+
 
