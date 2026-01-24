@@ -156,14 +156,15 @@ bot.on("message", async (msg) => {
   if (!isGroupChat(msg)) return;
 
   const chatId = msg.chat.id;
-  const text = (msg.caption || msg.text || "").trim();
+
+  // ✅ cukup sekali saja
+  const text = (msg.caption || msg.text || "").replace(/\s+/g, " ").trim();
   if (!text) return;
 
   // format:
   // sedekah12 T01 ndp
   // Koying12345 T02 rdp / rd
-const text = (msg.caption || msg.text || "").replace(/\s+/g, " ").trim();
-const m = text.match(/^(.+?)\s+\/?@?(T0[0-5])\s+(ndp|rd)$/i);
+  const m = text.match(/^(.+?)\s+\/?@?(T0[0-5])\s+(ndp|rd)$/i);
   if (!m) return;
 
   const namaValue = m[1].trim();        // sedekah12 / Koying12345
@@ -214,6 +215,7 @@ app.listen(PORT, () => {
   console.log("✅ Webhook endpoint: POST /webhook");
   console.log("✅ Sheet:", SHEET_NAME);
 });
+
 
 
 
