@@ -113,7 +113,7 @@ bot.on("message", async (msg) => {
 const m = text.match(/^(.+?)\s+\/?@?(T0[0-5])\s+(ndp|rdp|rd)$/i);
   if (!m) return;
 
- const namaValue = m[1].trim();        
+ const namaId = m[1].trim();        
 const tKey = m[2].toLowerCase();      // jadi "t02"
 const groupKey = m[3].toLowerCase();  // "rd" / "ndp" / "rdp"
 
@@ -155,6 +155,7 @@ app.listen(PORT, () => {
   console.log("✅ Webhook endpoint: POST /webhook");
   console.log("✅ Sheet:", SHEET_NAME);
 });
+
 
 
 
