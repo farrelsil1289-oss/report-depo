@@ -56,15 +56,16 @@ app.get("/", (req, res) =>
  * ✅ Webhook endpoint HARUS /webhook
  * Karena webhook Telegram kamu sekarang mengarah ke .../webhook
  */
-app.post("/webhook", async (req, res) => {
-  try {
-    console.log("📩 UPDATE MASUK:", JSON.stringify(req.body));
-    await bot.processUpdate(req.body);
-    res.sendStatus(200);
-  } catch (e) {
-    console.error("❌ Webhook error:", e?.message || e);
-    res.sendStatus(500);
-  }
+app.post("/webhook", (req, res) => {
+  // ✅ balas cepat supaya Telegram tidak retry
+  res.sendStatus(200);
+
+  console.log("📩 UPDATE MASUK:", JSON.stringify(req.body));
+
+  // proses update tanpa nahan response
+  bot.processUpdate(req.body).catch((e) => {
+    console.error("❌ processUpdate error:", e?.message || e);
+  });
 });
 
 /* =======================
@@ -81,6 +82,16 @@ async function safeSendMessage(chatId, text, options = {}) {
     console.error("⚠️ Gagal kirim pesan:", e?.message || e);
     return null;
   }
+}
+
+// =======================
+// WRITE QUEUE (ANTI TABRAKAN CHAT)
+// =======================
+let writeQueue = Promise.resolve();
+
+function enqueueWrite(fn) {
+  writeQueue = writeQueue.then(fn).catch(() => {});
+  return writeQueue;
 }
 
 // Convert column index to letter (0=>A, 25=>Z, 26=>AA, dst)
@@ -164,47 +175,42 @@ bot.on("message", async (msg) => {
   // format:
   // sedekah12 T01 ndp
   // Koying12345 T02 rdp / rd
-  const m = text.match(/^(.+?)\s+\/?@?(T0[0-5])\s+(ndp|rd)$/i);
+const m = text.match(/^(.+?)\s+\/?@?(T0[0-5])\s+(ndp|rdp|rd)$/i);
   if (!m) return;
 
-  const namaValue = m[1].trim();        // sedekah12 / Koying12345
-  const tKey = m[2].toUpperCase();      // T00 - T05
-  const groupKey = m[3].toLowerCase();  // ndp / rdp / rd
-
-  const base = getBaseColIndex(groupKey);
-  if (base === null) return;
-
-  const tOffset = parseInt(tKey.slice(1), 10); // 00..05 => 0..5
-  const colIndex = base + tOffset;
-  const colLetter = colToLetter(colIndex);
+ const namaValue = m[1].trim();        
+const tKey = m[2].toLowerCase();      // jadi "t02"
+const groupKey = m[3].toLowerCase();  // "rd" / "ndp" / "rdp"
 
   try {
-    const rowNumber = await findNextEmptyRowInColumnFromRow(
-      SHEET_NAME,
-      colLetter,
-      3 // data mulai row 3
-    );
-
-    await sheets.spreadsheets.values.update({
+  const appendRes = await enqueueWrite(async () => {
+    return await sheets.spreadsheets.values.append({
       spreadsheetId: SHEET_ID,
-      range: `${SHEET_NAME}!${colLetter}${rowNumber}`,
+      range: `${SHEET_NAME}!A:C`, // ✅ A=nama, B=tKey, C=group
       valueInputOption: "USER_ENTERED",
-      requestBody: { values: [[namaValue]] },
+      insertDataOption: "INSERT_ROWS",
+      requestBody: {
+        values: [[namaValue, tKey, groupKey]],
+      },
     });
+  });
 
-    await safeSendMessage(
-      chatId,
-      `✅ Disimpan!\nGrup: ${groupKey.toUpperCase()}\nKolom: ${tKey}\nValue: ${namaValue}\n📊 Baris: ${rowNumber}`,
-      { reply_to_message_id: msg.message_id }
-    );
+  const updatedRange = appendRes.data.updates?.updatedRange || "";
+  const rowNumber = Number((updatedRange.match(/(\d+)/) || [])[1]) || "-";
 
-    console.log(`✅ INPUT OK: ${namaValue} -> ${SHEET_NAME}!${colLetter}${rowNumber}`);
-  } catch (e) {
-    console.error("❌ Sheets error:", e?.message || e);
-    await safeSendMessage(chatId, "❌ Gagal simpan ke Google Sheets.", {
-      reply_to_message_id: msg.message_id,
-    });
-  }
+  await safeSendMessage(
+    chatId,
+    `✅ Disimpan!\nValue: ${namaValue}\nT: ${tKey}\nGrup: ${groupKey}\n📊 Baris: ${rowNumber}`,
+    { reply_to_message_id: msg.message_id }
+  );
+
+  console.log(`✅ APPEND OK: ${namaValue}, ${tKey}, ${groupKey} -> ${updatedRange}`);
+} catch (e) {
+  console.error("❌ Sheets error:", e?.message || e);
+  await safeSendMessage(chatId, "❌ Gagal simpan ke Google Sheets.", {
+    reply_to_message_id: msg.message_id,
+  });
+}
 });
 
 /* =======================
@@ -215,6 +221,7 @@ app.listen(PORT, () => {
   console.log("✅ Webhook endpoint: POST /webhook");
   console.log("✅ Sheet:", SHEET_NAME);
 });
+
 
 
 
