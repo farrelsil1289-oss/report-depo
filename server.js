@@ -94,71 +94,6 @@ function enqueueWrite(fn) {
   return writeQueue;
 }
 
-// Convert column index to letter (0=>A, 25=>Z, 26=>AA, dst)
-function colToLetter(colIndex) {
-  let temp = colIndex + 1;
-  let letter = "";
-  while (temp > 0) {
-    const mod = (temp - 1) % 26;
-    letter = String.fromCharCode(65 + mod) + letter;
-    temp = Math.floor((temp - 1) / 26);
-  }
-  return letter;
-}
-// 🔴 TAMBAHAN HELPER UNTUK RDP / NDP
-function getBaseColIndex(groupKey) {
-  const g = groupKey.toLowerCase();
-  if (g === "ndp") return 7;               // H
-  if (g === "rdp" || g === "rd") return 0; // A
-  return null;
-}
-
-// data mulai dari row 3
-async function findNextEmptyRowInColumnFromRow(sheetName, colLetter, startRow = 3) {
-  const gridRes = await sheets.spreadsheets.get({
-    spreadsheetId: SHEET_ID,
-    ranges: [`${sheetName}!${colLetter}${startRow}:${colLetter}`],
-    includeGridData: true,
-  });
-
-  const rowData = gridRes.data.sheets?.[0]?.data?.[0]?.rowData || [];
-
-  let idx = rowData.findIndex((r) => {
-    const cell = r.values?.[0];
-    const val = cell?.formattedValue;
-    return !val || val === "";
-  });
-
-  if (idx === -1) idx = rowData.length;
-
-  return idx + startRow;
-}
-
-/**
- * Cari baris kosong berikutnya pada kolom tertentu
- * Mulai scanning dari baris 2 (baris 1 header)
- */
-async function findNextEmptyRowInColumn(spreadsheetId, sheetName, colIndex) {
-  const colLetter = colToLetter(colIndex);
-
-  const gridRes = await sheets.spreadsheets.get({
-    spreadsheetId,
-    ranges: [`${sheetName}!${colLetter}2:${colLetter}`],
-    includeGridData: true,
-  });
-
-  const rowData = gridRes.data.sheets?.[0]?.data?.[0]?.rowData || [];
-
-  let targetRowIndex = rowData.findIndex((r) => {
-    const cell = r.values?.[0];
-    const val = cell?.formattedValue;
-    return !val || val === "";
-  });
-
-  if (targetRowIndex === -1) targetRowIndex = rowData.length;
-
-  return targetRowIndex + 2; // baris 2 = index 0
-}
 
 /* =======================
    MESSAGE HANDLER
@@ -188,7 +123,6 @@ const groupKey = m[3].toLowerCase();  // "rd" / "ndp" / "rdp"
       spreadsheetId: SHEET_ID,
       range: `${SHEET_NAME}!A:C`, // ✅ A=nama, B=tKey, C=group
       valueInputOption: "USER_ENTERED",
-      insertDataOption: "INSERT_ROWS",
       requestBody: {
         values: [[namaValue, tKey, groupKey]],
       },
@@ -221,6 +155,7 @@ app.listen(PORT, () => {
   console.log("✅ Webhook endpoint: POST /webhook");
   console.log("✅ Sheet:", SHEET_NAME);
 });
+
 
 
 
