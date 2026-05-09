@@ -147,6 +147,15 @@ const groupKey = m[3].toLowerCase();  // "rd" / "ndp" / "rdp"
 }
 });
 
+app.get("/keepalive", (req, res) => {
+  console.log("🔄 Keep alive ping");
+  res.send("OK");
+});
+
+function keepAliveLog() {
+  console.log("🟢 Bot depo masih hidup:", new Date().toLocaleString("id-ID"));
+}
+
 /* =======================
    START
 ======================= */
@@ -154,6 +163,13 @@ app.listen(PORT, () => {
   console.log("🚀 Server running on port", PORT);
   console.log("✅ Webhook endpoint: POST /webhook");
   console.log("✅ Sheet:", SHEET_NAME);
+  // log tiap 3 jam
+  keepAliveLog();
+
+  setInterval(() => {
+    keepAliveLog();
+  }, 3 * 60 * 60 * 1000);
+   
 });
 
 
